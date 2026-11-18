@@ -7,7 +7,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # 固定版本，避免 ubuntu-latest 标签漂移带来的环境不确定性
+    runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -18,20 +20,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK platform & build-tools
+      # 不使用 android-actions/setup-android@v3：
+      # 它会尝试安装已废弃的 "tools" 包而必然失败(exit code 1)。
+      # GitHub 托管的 ubuntu-24.04 镜像自带完整 Android SDK 与 cmdline-tools，
+      # 这里直接用镜像自带 sdkmanager 接受许可证并补装所需组件。
+      - name: Accept SDK licenses & install platform
+        shell: bash
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then
+            SDKMGR=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          fi
+          echo "sdkmanager: $SDKMGR"
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
+      # setup-gradle 会读取 gradle-wrapper.properties 自动下载对应版本(8.11.1)并加入 PATH，
+      # 因此用 gradle 命令即可，不依赖缺失的 gradle-wrapper.jar。
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - name: Grant execute permission
-        run: chmod +x ./gradlew || true
 
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
