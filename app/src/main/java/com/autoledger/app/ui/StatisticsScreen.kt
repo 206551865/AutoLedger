@@ -134,7 +134,7 @@ fun StatisticsScreen(transactions: List<Transaction>, viewModel: LedgerViewModel
                 } else {
                     Spacer(Modifier.size(12.dp))
                     summary.categoryBreakdown.forEach { (cat, amount) ->
-                        val ratio = (amount / summary.expense).let { if (it.isNaN()) 0f else it }
+                        val ratio: Double = if (summary.expense > 0.0) (amount / summary.expense) else 0.0
                         Column(Modifier.padding(vertical = 6.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("$cat  ${String.format("%.0f", ratio * 100)}%", fontSize = 13.sp)
@@ -148,7 +148,7 @@ fun StatisticsScreen(transactions: List<Transaction>, viewModel: LedgerViewModel
                                 )
                             ) {
                                 Box(
-                                    Modifier.fillMaxWidth(ratio.coerceIn(0f, 1f)).height(8.dp).background(
+                                    Modifier.fillMaxWidth(ratio.coerceIn(0.0, 1.0).toFloat()).height(8.dp).background(
                                         categoryBarColor(cat),
                                         RoundedCornerShape(4.dp)
                                     )

@@ -24,15 +24,16 @@ object SourceToggle {
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** 判断某包名是否启用（默认 true） */
-    fun isEnabled(packageName: String, context: Context): Boolean {
+    /** 判断某包名对应的来源是否启用（默认 true）。未知来源返回 false，避免误记。 */
+    fun isPackageEnabled(packageName: String, context: Context): Boolean {
         val def = KNOWN_SOURCES.firstOrNull { src ->
             src.packageKeywords.any { packageName.lowercase().contains(it.lowercase()) }
-        } ?: return false // 未知来源默认不处理，避免误记
+        } ?: return false
         return prefs(context).getBoolean(KEY_PREFIX + def.id, true)
     }
 
-    fun isEnabled(sourceId: String, context: Context): Boolean =
+    /** 按来源 id 判断是否启用（供设置页使用） */
+    fun isSourceEnabled(sourceId: String, context: Context): Boolean =
         prefs(context).getBoolean(KEY_PREFIX + sourceId, true)
 
     fun setEnabled(sourceId: String, enabled: Boolean, context: Context) {

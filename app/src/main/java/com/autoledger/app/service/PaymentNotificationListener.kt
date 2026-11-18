@@ -35,7 +35,7 @@ class PaymentNotificationListener : NotificationListenerService() {
         val packageName = notification.packageName ?: return
 
         // 只处理已启用的来源，避免误记其他 App
-        if (!SourceToggle.isEnabled(packageName, this)) return
+        if (!SourceToggle.isPackageEnabled(packageName, this)) return
 
         val extras: Bundle = notification.notification.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()

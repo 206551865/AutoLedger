@@ -108,7 +108,7 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
             SectionCard("自动记账来源") {
                 Spacer(Modifier.size(8.dp))
                 SourceToggle.KNOWN_SOURCES.forEach { src ->
-                    var enabled by remember { mutableStateOf(SourceToggle.isEnabled(src.id, context)) }
+                    var enabled by remember { mutableStateOf(SourceToggle.isSourceEnabled(src.id, context)) }
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
