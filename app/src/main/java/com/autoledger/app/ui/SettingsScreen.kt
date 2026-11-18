@@ -47,8 +47,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.autoledger.app.service.NotificationDebugLog
 import com.autoledger.app.service.SourceToggle
 import com.autoledger.app.viewmodel.LedgerViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +60,7 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
     val context = LocalContext.current
     var granted by remember { mutableStateOf(SourceToggle.isNotificationAccessGranted(context)) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showDebugDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -139,6 +144,12 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
                 }
             }
 
+            // 通知诊断入口
+            TextButton(
+                onClick = { showDebugDialog = true },
+                Modifier.fillMaxWidth()
+            ) { Text("🔍 通知诊断（查看支付通知为何没记账）") }
+
             // 刷新权限状态
             TextButton(
                 onClick = {
@@ -171,6 +182,53 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showDebugDialog) {
+        val logs = NotificationDebugLog.read(context)
+        val fmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+        AlertDialog(
+            onDismissRequest = { showDebugDialog = false },
+            title = { Text("通知诊断（最近 ${logs.size} 条）") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    if (logs.isEmpty()) {
+                        Text(
+                            "还没有收到任何支付类通知。\n\n" +
+                                "请确认：\n" +
+                                "1. 通知使用权已开启\n" +
+                                "2. 上方「自动记账来源」开关已打开\n" +
+                                "3. 然后做一笔微信支付，再回来查看",
+                            fontSize = 13.sp, color = Color.Gray
+                        )
+                    } else {
+                        logs.forEach { entry ->
+                            Column(Modifier.padding(vertical = 6.dp)) {
+                                Text(
+                                    "${fmt.format(Date(entry.time))}  " +
+                                        if (entry.ok) "✅ ${entry.result}" else "⚠️ ${entry.result}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (entry.ok) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                )
+                                Text("来源: ${entry.pkg}", fontSize = 11.sp, color = Color.Gray)
+                                Text("原文: ${entry.content}", fontSize = 11.sp, color = Color.Gray)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    NotificationDebugLog.clear(context)
+                    Toast.makeText(context, "日志已清空", Toast.LENGTH_SHORT).show()
+                    showDebugDialog = false
+                }) { Text("清空日志") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDebugDialog = false }) { Text("关闭") }
             }
         )
     }

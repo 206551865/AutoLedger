@@ -17,7 +17,7 @@ object NotificationParser {
     private val AMOUNT_PATTERNS = listOf(
         Regex("""(?:¥|￥)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""),       // ¥123.45 / ￥1,234
         Regex("""([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*元"""),             // 123.45元
-        Regex("""(?:金额|金额|支付|消费|付款|收入|收款|余额变动)[^0-9]{0,6}([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""), // 金额123.45
+        Regex("""(?:金额|转账金额|支付|消费|付款|收入|收款|余额变动|转账|零钱变动)[^0-9]{0,8}([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""), // 金额123.45 / 转账¥100
         Regex("""(?<!\d)([0-9]{1,6}\.[0-9]{2})(?!\d)""")                // 兜底：独立的两位小数
     )
 
@@ -45,8 +45,9 @@ object NotificationParser {
         Regex("""(?:来自|来自用户|付款人)\s*[:：]?\s*([^\s,，。；;]{2,24})""")
     )
 
-    /** 明确不是支付通知的关键词（用于降噪） */
-    private val NOISE_KEYWORDS = listOf("验证码", "校验码", "登录", "密码", "广告", "优惠", "活动推荐")
+    /** 明确不是支付通知的关键词（用于降噪）。
+     *  注意：不要放「优惠」「红包」这类词——微信支付通知常带「支付有优惠」字样，会误杀真实账目。 */
+    private val NOISE_KEYWORDS = listOf("验证码", "校验码", "登录密码", "广告推送", "活动推荐")
 
     /**
      * 解析一条通知。
@@ -117,5 +118,20 @@ object NotificationParser {
         text.contains("支付宝") -> PaymentSource.ALIPAY
         text.contains("银行") || text.contains("储蓄卡") || text.contains("信用卡") -> PaymentSource.BANK
         else -> PaymentSource.UNKNOWN
+    }
+
+    /**
+     * 解释一条通知为什么解析失败（诊断用）。
+     * 与 parse() 的失败路径保持一致。
+     */
+    fun explainFailure(text: String): String {
+        if (text.isBlank()) return "通知内容为空"
+        val normalized = text.replace("\n", " ").replace(Regex("\\s+"), " ").trim()
+        val hitNoise = NOISE_KEYWORDS.firstOrNull { normalized.contains(it) }
+        if (hitNoise != null) return "被降噪词「$hitNoise」过滤"
+        val amount = extractAmount(normalized)
+        if (amount == null) return "未识别到金额（通知正文里可能没有写金额，微信好友转账常见此情况）"
+        if (amount <= 0.0) return "金额无效"
+        return "其他原因"
     }
 }

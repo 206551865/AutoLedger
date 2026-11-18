@@ -43,9 +43,18 @@ class PaymentNotificationListener : NotificationListenerService() {
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
         val content = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ")
 
-        if (content.isBlank()) return
+        if (content.isBlank()) {
+            NotificationDebugLog.add(this, packageName, "(空通知)", "通知内容为空，丢弃", false)
+            return
+        }
 
-        val parsed = NotificationParser.parse(content, packageName) ?: return
+        val parsed = NotificationParser.parse(content, packageName)
+        if (parsed == null) {
+            // 解析失败，记录原因——核心诊断信息
+            val reason = NotificationParser.explainFailure(content)
+            NotificationDebugLog.add(this, packageName, content, reason, false)
+            return
+        }
 
         val timestamp = notification.postTime
         // 去重 key：来源 + 金额 + 商户 + 分钟级时间，防止同一次支付重复通知入库
@@ -72,10 +81,15 @@ class PaymentNotificationListener : NotificationListenerService() {
             // 二次校验去重（数据库唯一索引 + 查询双保险）
             if (dao.findByDedupKey(dedupKey) != null) {
                 Log.d(TAG, "重复通知，跳过: $dedupKey")
+                NotificationDebugLog.add(this@PaymentNotificationListener, packageName, content, "重复通知，跳过", false)
                 return@launch
             }
             dao.insert(tx)
             Log.i(TAG, "已记账: ${tx.sourceLabel} ${tx.amount} ${tx.merchant} [$category]")
+            NotificationDebugLog.add(
+                this@PaymentNotificationListener, packageName, content,
+                "✓已记账 ¥${tx.amount} ${if (isIncome) "收入" else "支出"}·$category", true
+            )
         }
     }
 
