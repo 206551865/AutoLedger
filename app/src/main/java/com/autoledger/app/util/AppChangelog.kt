@@ -14,6 +14,16 @@ data class ReleaseNote(
 object AppChangelog {
     val releases = listOf(
         ReleaseNote(
+            version = "1.3.0",
+            code = 4,
+            date = "2026-11-19",
+            notes = listOf(
+                "修复 AI 页按系统返回键会退出 App 的问题",
+                "新增「点击说话」语音记账，识别后自动填入解析",
+                "顶部返回按钮更好点，消除兼容警告"
+            )
+        ),
+        ReleaseNote(
             version = "1.2.0",
             code = 3,
             date = "2026-11-19",

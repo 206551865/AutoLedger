@@ -1,5 +1,12 @@
 package com.autoledger.app.ui
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -26,7 +33,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -52,10 +59,43 @@ fun AICaptureScreen(
     viewModel: LedgerViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     var text by remember { mutableStateOf("午饭 星巴克 38 块") }
     var result by remember { mutableStateOf<LedgerViewModel.NlParseResult?>(null) }
     var showToast by remember { mutableStateOf(false) }
     var parseFailed by remember { mutableStateOf(false) }
+
+    // 拦截系统返回键：在 AI 页按返回只关闭本页，不退出整个 App
+    BackHandler { onBack() }
+
+    // 语音识别：调用系统语音输入，把说的话填入输入框并立即解析
+    val voiceLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        if (activityResult.resultCode == Activity.RESULT_OK) {
+            val spoken = activityResult.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                ?.trim()
+            if (!spoken.isNullOrBlank()) {
+                text = spoken
+                result = viewModel.parseNaturalLanguage(spoken)
+                parseFailed = result == null
+                showToast = false
+            }
+        }
+    }
+    fun startVoiceInput() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "说一句话，自动记账")
+        }
+        runCatching { voiceLauncher.launch(intent) }
+            .onFailure {
+                Toast.makeText(context, "当前设备不支持语音输入，请用键盘输入", Toast.LENGTH_SHORT).show()
+            }
+    }
 
     // 记账成功提示 2 秒后自动消失
     LaunchedEffect(showToast) {
@@ -71,10 +111,14 @@ fun AICaptureScreen(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.size(34.dp).background(YS.surface, YS.rIcon)
+            Box(Modifier.size(40.dp).background(YS.surface, YS.rIcon)
                 .border(1.dp, YS.line, YS.rIcon).clickable { onBack() },
                 contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = YS.inkSoft, modifier = Modifier.size(16.dp))
+                @Suppress("DEPRECATION")
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "返回", tint = YS.inkSoft, modifier = Modifier.size(18.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
             Text("AI 智能记账", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = YS.ink)
@@ -135,12 +179,15 @@ fun AICaptureScreen(
                 ),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = YS.ink)
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.clickable { startVoiceInput() }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(Modifier.size(30.dp).background(YS.surface2, YS.rIcon), contentAlignment = Alignment.Center) {
                     Text("🎤", fontSize = 14.sp)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text("按住说话", fontSize = 10.sp, color = YS.inkFaint)
+                Text("点击说话", fontSize = 10.sp, color = YS.brand)
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier.background(YS.brand, YS.rIcon)
