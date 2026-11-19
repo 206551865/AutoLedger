@@ -194,6 +194,20 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
             title = { Text("通知诊断（最近 ${logs.size} 条）") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
+                    // 服务连接状态
+                    val lastConn = NotificationDebugLog.lastConnected(context)
+                    val connText = if (lastConn > 0L) {
+                        "✅ 监听服务已连接\n最后连接：${SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(lastConn))}"
+                    } else {
+                        "❌ 监听服务从未连接\n系统没有真正启动通知监听，请检查通知使用权与自启动权限"
+                    }
+                    Text(
+                        connText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (lastConn > 0L) Color(0xFF2E7D32) else Color(0xFFC62828),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
                     if (logs.isEmpty()) {
                         Text(
                             "还没有收到任何支付类通知。\n\n" +

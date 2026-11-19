@@ -27,6 +27,7 @@ class PaymentNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "通知监听服务已连接")
+        NotificationDebugLog.markConnected(this)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

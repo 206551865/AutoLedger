@@ -12,6 +12,7 @@ object NotificationDebugLog {
 
     private const val PREFS = "notif_debug_log"
     private const val KEY_LOGS = "logs"
+    private const val KEY_LAST_CONNECTED = "last_connected"
     private const val MAX_LOGS = 50
 
     data class Entry(
@@ -62,6 +63,15 @@ object NotificationDebugLog {
         }
         return result
     }
+
+    /** 记录监听服务连接成功的时间戳 */
+    fun markConnected(context: Context) {
+        prefs(context).edit().putLong(KEY_LAST_CONNECTED, System.currentTimeMillis()).apply()
+    }
+
+    /** 最近一次连接时间，0 表示从未连接 */
+    fun lastConnected(context: Context): Long =
+        prefs(context).getLong(KEY_LAST_CONNECTED, 0L)
 
     fun clear(context: Context) {
         prefs(context).edit().remove(KEY_LOGS).apply()
