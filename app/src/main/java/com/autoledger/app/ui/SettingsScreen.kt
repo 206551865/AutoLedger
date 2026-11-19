@@ -42,8 +42,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.autoledger.app.BuildConfig
 import com.autoledger.app.service.NotificationDebugLog
 import com.autoledger.app.service.SourceToggle
+import com.autoledger.app.util.AppChangelog
 import com.autoledger.app.ui.theme.YS
 import com.autoledger.app.viewmodel.LedgerViewModel
 import java.text.SimpleDateFormat
@@ -57,6 +59,7 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
     var granted by remember { mutableStateOf(SourceToggle.isNotificationAccessGranted(context)) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showDebugDialog by remember { mutableStateOf(false) }
+    var showChangelogDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
         Text("我的", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = YS.ink,
@@ -72,7 +75,7 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text("有数 · Youshu", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("有数记账", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("心中有数，每一笔都从容", fontSize = 11.sp, color = Color.White.copy(0.75f))
                 }
             }
@@ -126,6 +129,7 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
         // 功能入口
         YsCard("工具") {
             SettingsAction("🔍", "通知诊断", "查看支付通知为何没记账") { showDebugDialog = true }
+            SettingsAction("📋", "版本记录", "查看每次更新内容") { showChangelogDialog = true }
             SettingsAction("🔄", "刷新权限状态", "重新检测通知使用权") {
                 granted = SourceToggle.isNotificationAccessGranted(context)
                 onPermissionChanged()
@@ -150,8 +154,10 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
             Text("清空所有账单数据", color = YS.expense, fontSize = 13.sp,
                 modifier = Modifier.padding(vertical = 10.dp))
         }
-        Text("有数 Youshu · v1.0", fontSize = 11.sp, color = YS.inkFaint,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text("有数记账 · v${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE})",
+            fontSize = 11.sp, color = YS.inkFaint,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 
     if (showClearDialog) {
@@ -209,6 +215,32 @@ fun SettingsScreen(viewModel: LedgerViewModel, onPermissionChanged: () -> Unit) 
                 }) { Text("清空日志", color = YS.brand) }
             },
             dismissButton = { TextButton(onClick = { showDebugDialog = false }) { Text("关闭", color = YS.inkSoft) } }
+        )
+    }
+
+    if (showChangelogDialog) {
+        AlertDialog(
+            onDismissRequest = { showChangelogDialog = false },
+            title = { Text("版本记录", color = YS.ink) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    AppChangelog.releases.forEach { release ->
+                        Column(Modifier.padding(vertical = 8.dp)) {
+                            Text(
+                                "v${release.version} (code ${release.code}) · ${release.date}",
+                                fontSize = 13.sp, fontWeight = FontWeight.Bold, color = YS.brand
+                            )
+                            release.notes.forEach { note ->
+                                Text("· $note", fontSize = 11.sp, color = YS.inkSoft,
+                                    modifier = Modifier.padding(start = 6.dp, top = 3.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChangelogDialog = false }) { Text("关闭", color = YS.brand) }
+            }
         )
     }
 }

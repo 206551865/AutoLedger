@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">自动记账</string>
-    <string name="notification_listener_label">自动记账 · 通知监听</string>
-    <string name="notification_channel_name">记账通知</string>
-    <string name="notification_channel_desc">自动记账监听服务运行状态</string>
+    <string name="app_name">有数记账</string>
+    <string name="notification_listener_label">有数记账 · 通知监听</string>
+    <string name="notification_channel_name">有数记账通知</string>
+    <string name="notification_channel_desc">有数记账监听服务运行状态</string>
 </resources>
