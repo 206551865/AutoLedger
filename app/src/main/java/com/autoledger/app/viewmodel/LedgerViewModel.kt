@@ -7,6 +7,7 @@ import com.autoledger.app.AutoLedgerApp
 import com.autoledger.app.data.CategoryRules
 import com.autoledger.app.data.Transaction
 import com.autoledger.app.data.TxType
+import com.autoledger.app.parser.NotificationParser
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -40,6 +41,46 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
             )
         }
     }
+
+    /** 解析自然语言记账文本（如「午饭 星巴克 38 块」），返回结构化结果 */
+    fun parseNaturalLanguage(text: String): NlParseResult? {
+        val parsed = NotificationParser.parse(text) ?: return null
+        val merchant = parsed.merchant.ifBlank { "日常消费" }
+        val category = CategoryRules.classify(merchant, parsed.type == TxType.INCOME)
+        return NlParseResult(
+            amount = parsed.amount,
+            merchant = merchant,
+            category = category,
+            type = parsed.type
+        )
+    }
+
+    /** 确认一条自然语言解析结果并入库 */
+    fun confirmNaturalLanguage(result: NlParseResult) {
+        if (result.amount <= 0.0) return
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            dao.insert(
+                Transaction(
+                    amount = result.amount,
+                    merchant = result.merchant,
+                    type = result.type,
+                    category = result.category,
+                    timestamp = now,
+                    source = "ai",
+                    sourceLabel = "AI 记账",
+                    dedupKey = "ai|${result.amount}|${result.merchant}|${now / 1000}"
+                )
+            )
+        }
+    }
+
+    data class NlParseResult(
+        val amount: Double,
+        val merchant: String,
+        val category: String,
+        val type: TxType
+    )
 
     fun delete(tx: Transaction) {
         viewModelScope.launch { dao.delete(tx) }

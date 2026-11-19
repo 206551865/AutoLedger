@@ -2,6 +2,8 @@ package com.autoledger.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,181 +18,164 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.autoledger.app.data.Transaction
-import com.autoledger.app.ui.theme.LedgerColors
+import com.autoledger.app.ui.theme.YS
 import com.autoledger.app.util.formatMoney
 import com.autoledger.app.viewmodel.LedgerViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(transactions: List<Transaction>, viewModel: LedgerViewModel) {
     val summary = remember(transactions) { viewModel.monthlySummary(transactions) }
-    val months = remember(transactions) { viewModel.last6Months(transactions) }
-    val maxAmount = remember(months) {
-        maxOf(1.0, months.maxOf { maxOf(it.income, it.expense) })
-    }
-    val catMax = remember(summary) { summary.categoryBreakdown.firstOrNull()?.second ?: 1.0 }
+    val monthText = SimpleDateFormat("M 月", Locale.getDefault()).format(Date())
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("统计", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White
-                )
-            )
-        }
-    ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    val topCats = summary.categoryBreakdown.take(5)
+    val totalExpense = summary.expense
+    val palette = listOf(YS.brand, YS.expense, YS.blue, YS.sand, YS.inkFaint)
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // 标题 + 月份
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 本月概览卡片
-            Box(
-                Modifier.fillMaxWidth().background(
-                    MaterialTheme.colorScheme.primary,
-                    RoundedCornerShape(16.dp)
-                ).padding(20.dp)
+            Text("支出分析", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = YS.ink)
+            Box(Modifier.background(YS.surface, RoundedCornerShape(100))
+                .border(1.dp, YS.line, RoundedCornerShape(100))
+                .padding(horizontal = 11.dp, vertical = 7.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(monthText, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = YS.inkSoft)
+                    Spacer(Modifier.width(5.dp))
+                    Text("▾", fontSize = 11.sp, color = YS.inkSoft)
+                }
+            }
+        }
+
+        // 总支出
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("本月总支出", fontSize = 11.sp, color = YS.inkFaint)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("¥ ", fontSize = 20.sp, color = YS.ink, fontFamily = YS.fontNum)
+                Text(formatMoney(totalExpense), fontFamily = YS.fontNum, fontSize = 34.sp,
+                    fontWeight = FontWeight.Medium, color = YS.ink)
+            }
+        }
+
+        // 甜甜圈 + 图例
+        if (topCats.isEmpty()) {
+            Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                Text("本月还没有支出记录", fontSize = 12.sp, color = YS.inkFaint)
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text("本月概览", color = Color.White.copy(0.85f), fontSize = 14.sp)
-                    Spacer(Modifier.size(16.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            Text("收入", color = Color.White.copy(0.85f), fontSize = 13.sp)
-                            Text("¥${formatMoney(summary.income)}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text("支出", color = Color.White.copy(0.85f), fontSize = 13.sp)
-                            Text("¥${formatMoney(summary.expense)}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                DonutChart(topCats.map { it.second }, palette)
+                Spacer(Modifier.width(20.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    topCats.forEachIndexed { i, (cat, amount) ->
+                        val pct = if (totalExpense > 0) (amount / totalExpense * 100).toInt() else 0
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).background(palette[i], RoundedCornerShape(3.dp)))
+                            Spacer(Modifier.width(7.dp))
+                            Text(cat, fontSize = 10.5.sp, color = YS.inkSoft, modifier = Modifier.weight(1f))
+                            Text("$pct%", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = YS.ink,
+                                fontFamily = YS.fontNum)
                         }
                     }
-                    Spacer(Modifier.size(12.dp))
+                }
+            }
+
+            // 支出排行
+            Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
+                Text("支出排行", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = YS.ink)
+                Spacer(Modifier.height(14.dp))
+                val maxAmt = topCats.firstOrNull()?.second ?: 1.0
+                topCats.forEachIndexed { i, (cat, amount) ->
+                    val pct = if (totalExpense > 0) (amount / totalExpense * 100).toInt() else 0
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(cat, fontSize = 11.sp, color = YS.inkSoft)
+                        Text("¥ ${formatMoney(amount)}", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            color = YS.ink, fontFamily = YS.fontNum)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Box(Modifier.fillMaxWidth().height(6.dp).background(YS.surface3, RoundedCornerShape(100))) {
+                        Box(Modifier.fillMaxWidth((amount / maxAmt).coerceIn(0.0, 1.0).toFloat())
+                            .height(6.dp).background(palette[i], RoundedCornerShape(100)))
+                    }
+                    Spacer(Modifier.height(13.dp))
+                }
+            }
+
+            // AI 提示
+            Box(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 8.dp)) {
+                Row(Modifier.background(YS.brandTint, YS.rCard).padding(14.dp)) {
+                    Text("✦", color = YS.brand, fontSize = 16.sp)
+                    Spacer(Modifier.width(10.dp))
+                    val top = topCats.first()
+                    val pct = if (totalExpense > 0) (top.second / totalExpense * 100).toInt() else 0
                     Text(
-                        "本月共 ${summary.count} 笔 · 结余 ¥${formatMoney(summary.income - summary.expense)}",
-                        color = Color.White.copy(0.9f), fontSize = 13.sp
+                        "「${top.first}」占本月支出 ${pct}%，是当前最大的开支项。合理规划这一项，能让结余更可观。",
+                        fontSize = 10.5.sp, color = YS.inkSoft, lineHeight = 17.sp
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(100.dp))
+    }
+}
 
-            // 近 6 个月趋势
-            SectionCard("近 6 个月收支趋势") {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    LegendDot(LedgerColors.Income, "收入")
-                    LegendDot(LedgerColors.Expense, "支出")
-                }
-                Spacer(Modifier.size(8.dp))
-                Canvas(Modifier.fillMaxWidth().height(180.dp)) {
-                    val groupCount = months.size
-                    val groupWidth = size.width / groupCount
-                    val barWidth = groupWidth * 0.28f
-                    val chartHeight = size.height - 30f
-                    months.forEachIndexed { i, m ->
-                        val centerX = groupWidth * i + groupWidth / 2
-                        val incomeH = (m.income / maxAmount * chartHeight).toFloat()
-                        val expenseH = (m.expense / maxAmount * chartHeight).toFloat()
-                        drawRect(
-                            color = LedgerColors.Income,
-                            topLeft = Offset(centerX - barWidth - 2f, chartHeight - incomeH),
-                            size = Size(barWidth, incomeH)
-                        )
-                        drawRect(
-                            color = LedgerColors.Expense,
-                            topLeft = Offset(centerX + 2f, chartHeight - expenseH),
-                            size = Size(barWidth, expenseH)
-                        )
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    months.forEach { Text(it.label, fontSize = 12.sp, color = Color.Gray) }
-                }
-            }
-
-            // 本月支出分类占比
-            SectionCard("本月支出分类") {
-                if (summary.categoryBreakdown.isEmpty()) {
-                    Text("本月暂无支出", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp))
-                } else {
-                    Spacer(Modifier.size(12.dp))
-                    summary.categoryBreakdown.forEach { (cat, amount) ->
-                        val ratio: Double = if (summary.expense > 0.0) (amount / summary.expense) else 0.0
-                        Column(Modifier.padding(vertical = 6.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("$cat  ${String.format("%.0f", ratio * 100)}%", fontSize = 13.sp)
-                                Text("¥${formatMoney(amount)}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            }
-                            Spacer(Modifier.size(4.dp))
-                            Box(
-                                Modifier.fillMaxWidth().height(8.dp).background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(4.dp)
-                                )
-                            ) {
-                                Box(
-                                    Modifier.fillMaxWidth(ratio.coerceIn(0.0, 1.0).toFloat()).height(8.dp).background(
-                                        categoryBarColor(cat),
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                )
-                            }
-                        }
-                    }
+@Composable
+private fun DonutChart(amounts: List<Double>, colors: List<Color>) {
+    val total = amounts.sum()
+    Box(Modifier.size(132.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(132.dp)) {
+            val stroke = 15.dp.toPx()
+            val radius = (size.minDimension - stroke) / 2
+            val topLeft = androidx.compose.ui.geometry.Offset(
+                (size.width - radius * 2) / 2,
+                (size.height - radius * 2) / 2
+            )
+            val arcSize = Size(radius * 2, radius * 2)
+            // 底环
+            drawArc(
+                color = YS.surface3,
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = Stroke(width = stroke)
+            )
+            if (total > 0) {
+                var start = -90f
+                amounts.forEachIndexed { i, amount ->
+                    val sweep = (amount / total * 360).toFloat()
+                    drawArc(
+                        color = colors[i % colors.size],
+                        startAngle = start, sweepAngle = sweep, useCenter = false,
+                        topLeft = topLeft, size = arcSize, style = Stroke(width = stroke)
+                    )
+                    start += sweep
                 }
             }
         }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            val topPct = if (total > 0) (amounts.maxOrNull()!! / total * 100).toInt() else 0
+            Text("$topPct%", fontFamily = YS.fontNum, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = YS.ink)
+            Text("最大占比", fontSize = 9.sp, color = YS.inkFaint)
+        }
     }
-}
-
-@Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().background(
-            MaterialTheme.colorScheme.surface,
-            RoundedCornerShape(16.dp)
-        ).padding(16.dp)
-    ) {
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        content()
-    }
-}
-
-@Composable
-private fun LegendDot(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).background(color, RoundedCornerShape(50)))
-        Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 12.sp, color = Color.Gray)
-    }
-}
-
-private fun categoryBarColor(category: String): Color = when (category) {
-    "餐饮" -> Color(0xFFFF9800)
-    "交通" -> Color(0xFF2196F3)
-    "购物" -> Color(0xFFE91E63)
-    "生活缴费" -> Color(0xFF8BC34A)
-    "娱乐" -> Color(0xFF9C27B0)
-    "医疗" -> Color(0xFFF44336)
-    "教育" -> Color(0xFF673AB7)
-    else -> Color(0xFF607D8B)
 }
