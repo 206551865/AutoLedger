@@ -1,5 +1,6 @@
 package com.autoledger.app.parser
 
+import com.autoledger.app.data.CategoryRules
 import com.autoledger.app.data.TxType
 
 /**
@@ -13,12 +14,21 @@ import com.autoledger.app.data.TxType
  */
 object NotificationParser {
 
-    /** 金额正则：按优先级排列，捕获组 1 为数字 */
+    /** 金额正则：按优先级排列，捕获组 1 为数字。
+     *  关键：「动作+金额」必须排在裸「元」之前，否则「余额10000元 消费88.5元」会把余额当金额。 */
     private val AMOUNT_PATTERNS = listOf(
         Regex("""(?:¥|￥)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""),       // ¥123.45 / ￥1,234
+        Regex("""(?:金额|转账金额|支付|消费|付款|支出|扣款|收入|收款|转账|零钱变动)[^0-9]{0,8}([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""), // 消费88.5 / 转账¥100
         Regex("""([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*元"""),             // 123.45元
-        Regex("""(?:金额|转账金额|支付|消费|付款|收入|收款|余额变动|转账|零钱变动)[^0-9]{0,8}([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""), // 金额123.45 / 转账¥100
         Regex("""(?<!\d)([0-9]{1,6}\.[0-9]{2})(?!\d)""")                // 兜底：独立的两位小数
+    )
+
+    /** 自然语言（AI 记账）专用金额模式：支持「38 块」「120」「18000」等无货币符号的口语 */
+    private val NL_AMOUNT_PATTERNS = listOf(
+        Regex("""(?:¥|￥)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""),
+        Regex("""([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:块钱|块|元|圆)"""),  // 38块 / 12.5元
+        Regex("""(?:花了|付了|支付|消费|收入|到账|工资|转账|收款)[^0-9]{0,6}([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""),
+        Regex("""(?<!\d)([0-9]{1,9}(?:\.[0-9]{1,2})?)(?!\d)""")           // 兜底：口语里出现的数字多半就是金额
     )
 
     /** 强收入信号（命中即判收入，优先于一切支出词） */
@@ -78,9 +88,46 @@ object NotificationParser {
         )
     }
 
+    /**
+     * 解析一句自然语言（AI 手动记账用），如「午饭 星巴克 38 块」。
+     * 与 [parse] 的不同：金额不要求货币符号，允许出现「块/元」或直接是数字；
+     * 商户支持从分类关键词反推，保证快捷标签也能正确归类。
+     */
+    fun parseNaturalLanguage(text: String): ParsedTransaction? {
+        if (text.isBlank()) return null
+        val normalized = text.replace("\n", " ").replace(Regex("\\s+"), " ").trim()
+        if (NOISE_KEYWORDS.any { normalized.contains(it) }) return null
+
+        val amount = extractAmountWith(normalized, NL_AMOUNT_PATTERNS) ?: return null
+        if (amount <= 0.0) return null
+
+        val type = detectDirection(normalized)
+        val merchant = extractNaturalMerchant(normalized)
+        return ParsedTransaction(
+            amount = amount,
+            merchant = merchant,
+            type = type,
+            source = PaymentSource.UNKNOWN,
+            rawText = normalized
+        )
+    }
+
+    /** 自然语言商户：先按标准模式提取，再按分类关键词反推，最后兜底整句关键词 */
+    private fun extractNaturalMerchant(text: String): String {
+        val explicit = extractMerchant(text)
+        if (explicit.isNotBlank()) return explicit
+        // 从文本里命中的最长分类关键词作为商户线索（星巴克/打车/超市/工资…）
+        val keyword = CategoryRules.allKeywords()
+            .filter { it.length >= 2 && text.contains(it, ignoreCase = true) }
+            .maxByOrNull { it.length }
+        return keyword.orEmpty()
+    }
+
     /** 从文本中提取第一个合理金额 */
-    private fun extractAmount(text: String): Double? {
-        for (pattern in AMOUNT_PATTERNS) {
+    private fun extractAmount(text: String): Double? = extractAmountWith(text, AMOUNT_PATTERNS)
+
+    private fun extractAmountWith(text: String, patterns: List<Regex>): Double? {
+        for (pattern in patterns) {
             val match = pattern.find(text) ?: continue
             val raw = match.groupValues[1].replace(",", "")
             val value = raw.toDoubleOrNull() ?: continue

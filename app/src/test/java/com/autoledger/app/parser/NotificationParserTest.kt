@@ -132,4 +132,55 @@ class NotificationParserTest {
         assertNotNull(r)
         assertEquals(PaymentSource.WECHAT, r!!.source)
     }
+
+    @Test
+    fun `余额在消费之前不应把余额当金额`() {
+        val r = parse("工商银行 余额10000.00元 消费88.50元")
+        assertNotNull(r)
+        assertEquals(88.50, r!!.amount, 0.001)
+        assertEquals(TxType.EXPENSE, r.type)
+    }
+
+    // ---------- AI 自然语言记账（设计稿默认提示语 + 快捷标签） ----------
+    private fun nl(text: String) = NotificationParser.parseNaturalLanguage(text)
+
+    @Test
+    fun `AI - 默认提示语午饭星巴克38块`() {
+        val r = nl("午饭 星巴克 38 块")
+        assertNotNull(r)
+        assertEquals(38.0, r!!.amount, 0.001)
+        assertEquals(TxType.EXPENSE, r.type)
+        assertEquals("星巴克", r.merchant)
+    }
+
+    @Test
+    fun `AI - 快捷标签打车25块`() {
+        val r = nl("打车 25 块")
+        assertNotNull(r)
+        assertEquals(25.0, r!!.amount, 0.001)
+        assertEquals("打车", r.merchant)
+    }
+
+    @Test
+    fun `AI - 快捷标签超市采购120`() {
+        val r = nl("超市采购 120")
+        assertNotNull(r)
+        assertEquals(120.0, r!!.amount, 0.001)
+    }
+
+    @Test
+    fun `AI - 快捷标签工资到账18000判收入`() {
+        val r = nl("工资到账 18000")
+        assertNotNull(r)
+        assertEquals(18000.0, r!!.amount, 0.001)
+        assertEquals(TxType.INCOME, r.type)
+    }
+
+    @Test
+    fun `AI - 晚饭和小李吃了火锅花了168`() {
+        val r = nl("晚饭和小李吃了火锅，花了 168")
+        assertNotNull(r)
+        assertEquals(168.0, r!!.amount, 0.001)
+        assertEquals("火锅", r.merchant)
+    }
 }

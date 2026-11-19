@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,15 @@ fun AICaptureScreen(
     var text by remember { mutableStateOf("午饭 星巴克 38 块") }
     var result by remember { mutableStateOf<LedgerViewModel.NlParseResult?>(null) }
     var showToast by remember { mutableStateOf(false) }
+    var parseFailed by remember { mutableStateOf(false) }
+
+    // 记账成功提示 2 秒后自动消失
+    LaunchedEffect(showToast) {
+        if (showToast) {
+            kotlinx.coroutines.delay(2000)
+            showToast = false
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // 顶部栏
@@ -136,6 +146,7 @@ fun AICaptureScreen(
                     Modifier.background(YS.brand, YS.rIcon)
                         .clickable {
                             result = viewModel.parseNaturalLanguage(text)
+                            parseFailed = result == null
                             showToast = false
                         }
                         .padding(horizontal = 15.dp, vertical = 9.dp)
@@ -155,7 +166,12 @@ fun AICaptureScreen(
                 Box(
                     Modifier.background(YS.surface, CircleShape)
                         .border(1.dp, YS.line, CircleShape)
-                        .clickable { text = chip; result = viewModel.parseNaturalLanguage(chip); showToast = false }
+                        .clickable {
+                        text = chip
+                        result = viewModel.parseNaturalLanguage(chip)
+                        parseFailed = result == null
+                        showToast = false
+                    }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(chip, fontSize = 10.sp, color = YS.inkSoft)
@@ -216,8 +232,9 @@ fun AICaptureScreen(
             if (text.isNotBlank()) {
                 Spacer(Modifier.height(18.dp))
                 Text(
-                    "点「AI 识别」解析这句话里的金额和商户",
-                    fontSize = 11.sp, color = YS.inkFaint,
+                    if (parseFailed) "没识别到金额，试试写成「午饭 星巴克 38 块」这样"
+                    else "点「AI 识别」解析这句话里的金额和商户",
+                    fontSize = 11.sp, color = if (parseFailed) YS.expense else YS.inkFaint,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp)
                 )
             }

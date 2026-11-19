@@ -14,6 +14,17 @@ data class ReleaseNote(
 object AppChangelog {
     val releases = listOf(
         ReleaseNote(
+            version = "1.2.0",
+            code = 3,
+            date = "2026-11-19",
+            notes = listOf(
+                "修复 AI 记账口语解析失败（如「午饭 星巴克 38 块」）",
+                "修复银行通知把余额误当消费金额",
+                "总览页收支标题按实际正负显示",
+                "AI 记账结果提示自动消失，失败时给出引导"
+            )
+        ),
+        ReleaseNote(
             version = "1.1.0",
             code = 2,
             date = "2026-11-19",

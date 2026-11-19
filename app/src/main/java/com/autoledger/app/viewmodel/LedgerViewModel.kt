@@ -44,7 +44,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
 
     /** 解析自然语言记账文本（如「午饭 星巴克 38 块」），返回结构化结果 */
     fun parseNaturalLanguage(text: String): NlParseResult? {
-        val parsed = NotificationParser.parse(text) ?: return null
+        val parsed = NotificationParser.parseNaturalLanguage(text) ?: return null
         val merchant = parsed.merchant.ifBlank { "日常消费" }
         val category = CategoryRules.classify(merchant, parsed.type == TxType.INCOME)
         return NlParseResult(

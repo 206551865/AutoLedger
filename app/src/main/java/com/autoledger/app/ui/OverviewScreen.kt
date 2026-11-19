@@ -50,6 +50,7 @@ fun OverviewScreen(
     val summary = remember(transactions) { viewModel.monthlySummary(transactions) }
     val net = summary.expense - summary.income
     val balance = summary.income - summary.expense
+    val netLabel = if (net >= 0) "本月净支出" else "本月净收入"
     val dateText = SimpleDateFormat("M 月 d 日 · EEEE", Locale.getDefault()).format(Date())
     val greet = greetingText()
 
@@ -95,7 +96,7 @@ fun OverviewScreen(
                 .padding(22.dp)
         ) {
             Column {
-                Text("本月净支出", fontSize = 11.sp, color = Color.White.copy(0.75f), fontWeight = FontWeight.Medium)
+                Text(netLabel, fontSize = 11.sp, color = Color.White.copy(0.75f), fontWeight = FontWeight.Medium)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text("¥", fontSize = 22.sp, color = Color.White.copy(0.8f), modifier = Modifier.padding(bottom = 5.dp))
                     Text(

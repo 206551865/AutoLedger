@@ -75,4 +75,7 @@ object CategoryRules {
     fun expenseCategories(): List<String> = RULES.map { it.first }.filterNot { it in INCOME_CATEGORIES } + "其他支出"
 
     fun allCategories(): List<String> = RULES.map { it.first } + listOf("其他支出", "其他收入")
+
+    /** 全部分类关键词，供「无明确商户时」提取分类线索使用 */
+    fun allKeywords(): List<String> = RULES.flatMap { it.second }
 }
